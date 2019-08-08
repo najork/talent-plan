@@ -6,7 +6,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use labrpc::RpcFuture;
+use labrpc::{RpcFuture, Error};
+use futures::future;
 
 // TTL is used for a lock key.
 // If the key's lifetime exceeds this value, it should be cleaned up.
@@ -15,14 +16,32 @@ const TTL: u64 = Duration::from_millis(100).as_nanos() as u64;
 
 #[derive(Clone, Default)]
 pub struct TimestampOracle {
-    // You definitions here if needed.
+    // timestamp is a thread-safe monotonically increasing counter
+    timestamp: Arc<Mutex<u64>>,
+}
+
+impl TimestampOracle {
+    // new returns a TimestampOracle with sensible defaults
+    pub fn new() -> TimestampOracle {
+        TimestampOracle {
+            timestamp: Arc::new(Mutex::new(0)),
+        }
+    }
 }
 
 impl timestamp::Service for TimestampOracle {
-    // example get_timestamp RPC handler.
     fn get_timestamp(&self, _: TimestampRequest) -> RpcFuture<TimestampResponse> {
-        // Your code here.
-        unimplemented!()
+        let timestamp = Arc::clone(&self.timestamp);
+        let mut latest = timestamp.lock().unwrap();
+
+        // check incrementing timestamp will not overflow
+        if *latest == std::u64::MAX {
+            return Box::new(future::result(Err(Error::Other("out of timestamps".to_owned()))))
+        }
+
+        // increment timestamp and send response
+        *latest += 1;
+        Box::new(future::result(Ok(TimestampResponse { timestamp: *latest })))
     }
 }
 

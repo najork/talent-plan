@@ -17,5 +17,5 @@ mod tests;
 
 // This is related to protobuf as described in `msg.proto`.
 mod msg {
-    include!(concat!(env!("OUT_DIR"), "/msg.rs"));
+    include!("../proto/msg.rs");
 }
